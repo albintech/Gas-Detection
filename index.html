@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Gas Leakage Data Logger</title>
+    <style>
+        /* CSS to match the dashboard look */
+        body { background-color: #1a2332; color: #ffffff; font-family: sans-serif; padding: 20px; }
+        .metrics-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+        .card { background-color: #243146; padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #2d3d56; }
+        .card-value { font-size: 1.8rem; font-weight: bold; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; background: #243146; }
+        th, td { padding: 15px; border: 1px solid #2d3d56; text-align: left; }
+        .safe { color: #10b981; }
+        .danger { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <h1>Gas Concentration Feed</h1>
+    <div class="metrics-row">
+        <div class="card">Live Gas Level<div id="liveGas" class="card-value">--</div></div>
+        <div class="card">System Threshold<div class="card-value">500 PPM</div></div>
+        <div class="card">Valve Position<div id="valveStatus" class="card-value">--</div></div>
+    </div>
+    <table>
+        <thead><tr><th>Date</th><th>Timestamp</th><th>Gas Concentration</th><th>Valve Status</th></tr></thead>
+        <tbody id="logBody"></tbody>
+    </table>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // Initialize Firebase
+        const db = getDatabase(initializeApp({
+            databaseURL: "https://gas-leak-detection-9e32e-default-rtdb.asia-southeast1.firebasedatabase.app/"
+        }));
+
+        let lastTimestamp = "";
+
+        // Listen for updates from the flat database path
+        onValue(ref(db, '/Gas_Detection_Logs'), (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                // Update top cards
+                document.getElementById('liveGas').innerText = data.gas_level + " PPM";
+                document.getElementById('valveStatus').innerText = data.status;
+                
+                // Add to history table if new update (every 30s)
+                if (data.timestamp !== lastTimestamp) {
+                    lastTimestamp = data.timestamp;
+                    const [date, time] = data.timestamp.split(" ");
+                    const row = `<tr><td>${date}</td><td>${time}</td><td>${data.gas_level} PPM</td><td class="${data.status.includes('LEAKAGE') ? 'danger' : 'safe'}">${data.status}</td></tr>`;
+                    document.getElementById('logBody').insertAdjacentHTML('afterbegin', row);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
